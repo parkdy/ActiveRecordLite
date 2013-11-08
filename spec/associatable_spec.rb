@@ -1,4 +1,5 @@
 require 'active_record_lite'
+require 'debugger'
 
 describe "associatable" do
   before(:all) do
@@ -27,6 +28,7 @@ describe "associatable" do
       set_table_name("houses")
       my_attr_accessible(:id, :address, :house_id)
     end
+
   end
 
   let(:cat) { Cat.find(1) }
@@ -53,7 +55,7 @@ describe "associatable" do
       human.cats.first.should be_instance_of(Cat)
     end
   end
-  
+
   describe "#has_one_through" do
     it "adds association as method" do
       cat.methods.should include(:house)
@@ -63,5 +65,5 @@ describe "associatable" do
       cat.house.should be_instance_of(House)
     end
   end
-  
+
 end
