@@ -36,17 +36,17 @@ class BelongsToAssocParams < AssocParams
   def initialize(name, params)
     @name = name
 
-    class_name = params[:class_name]
-    class_name = name.to_s.camelcase if class_name.nil?
-    @other_class_name = class_name
+    default = {
+      class_name: name.to_s.camelcase,
+      foreign_key: "#{name}_id",
+      primary_key: "id"
+    }
 
-    foreign_key = params[:foreign_key]
-    foreign_key = "#{name}_id" if foreign_key.nil?
-    @foreign_key = foreign_key
+    params = default.merge(params)
 
-    primary_key = params[:primary_key]
-    primary_key = "id" if primary_key.nil?
-    @primary_key = primary_key
+    @other_class_name = params[:class_name]
+    @foreign_key = params[:foreign_key]
+    @primary_key = params[:primary_key]
   end
 
   def type
@@ -54,7 +54,22 @@ class BelongsToAssocParams < AssocParams
 end
 
 class HasManyAssocParams < AssocParams
+  my_attr_accessor :name, :other_class_name, :primary_key, :foreign_key
+
   def initialize(name, params, self_class)
+    @name = name
+
+    default = {
+      class_name: name.to_s.singularize.camelcase,
+      foreign_key: "#{self_class.to_s.underscore}_id",
+      primary_key: "id"
+    }
+
+    params = default.merge(params)
+
+    @other_class_name = params[:class_name]
+    @foreign_key = params[:foreign_key]
+    @primary_key = params[:primary_key]
   end
 
   def type
@@ -91,6 +106,27 @@ module Associatable
   end
 
   def has_many(name, params = {})
+    define_method(name) do
+      hmap = HasManyAssocParams.new(name, params, self.class)
+
+      query = <<-SQL
+      SELECT
+        ot.*
+      FROM
+        #{hmap.other_table} ot
+      JOIN
+        #{self.class.table_name} t
+      ON
+        t.#{hmap.primary_key} = ot.#{hmap.foreign_key}
+      WHERE
+        t.id = ?
+      SQL
+
+      results = DBConnection.execute(query, self.id)
+
+      hmap.other_class.parse_all(results)
+
+    end
   end
 
   def has_one_through(name, assoc1, assoc2)
