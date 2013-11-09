@@ -1,5 +1,4 @@
 require 'active_record_lite'
-require 'debugger'
 
 describe "associatable" do
   before(:all) do

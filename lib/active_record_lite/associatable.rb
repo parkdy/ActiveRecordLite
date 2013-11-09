@@ -21,7 +21,7 @@ class AssocParams
   end
 
   def other_class
-    @other_class_name.to_s.capitalize.constantize
+    @other_class_name.constantize
   end
 
   def other_table
@@ -38,8 +38,8 @@ class BelongsToAssocParams < AssocParams
 
     default = {
       class_name: name.to_s.camelcase,
-      foreign_key: "#{name}_id",
-      primary_key: "id"
+      foreign_key: "#{name}_id".to_sym,
+      primary_key: :id
     }
 
     params = default.merge(params)
@@ -50,6 +50,7 @@ class BelongsToAssocParams < AssocParams
   end
 
   def type
+
   end
 end
 
@@ -78,12 +79,19 @@ end
 
 module Associatable
   def assoc_params
+    # return {} if @assoc_params.nil?
+    # @assoc_params
+    @assoc_params ||= {}
+    @assoc_params
   end
 
   def belongs_to(name, params = {})
 
     define_method(name) do
       btap = BelongsToAssocParams.new(name, params)
+      # @assoc_params ||= {}
+      # @assoc_params[name] = btap
+      self.class.assoc_params[name] = btap
 
       query = <<-SQL
       SELECT
@@ -130,5 +138,29 @@ module Associatable
   end
 
   def has_one_through(name, assoc1, assoc2)
+    define_method(name) do
+      btap1 = self.class.assoc_params[assoc1]
+      btap2 = btap1.other_class.assoc_params[assoc2]
+
+      query = <<-SQL
+      SELECT
+        ot2.*
+      FROM
+        #{self.class.table_name} t
+      JOIN
+        #{btap1.other_table} ot1
+      ON
+        t.#{btap1.foreign_key} = ot1.#{btap1.primary_key}
+      JOIN
+        #{btap2.other_table} ot2
+      ON
+        ot1.#{btap2.foreign_key} = ot2.#{btap2.primary_key}
+      WHERE
+        t.id = ?
+      SQL
+
+      results = DBConnection.execute(query, self.id)
+      btap2.other_class.parse_all(results).first
+    end
   end
 end
